@@ -3,7 +3,12 @@ import userApi from "./httpClients/userApi";
 export const userService = {
   // Métodos de registro y login
   registerUser: (userData) => userApi.post("/api/users/register", userData),
-  loginUser: (credentials) => userApi.post("/api/users/login", credentials),
+  
+  // Login actualizado para soportar CAPTCHA
+  loginUser: (credentials) => {
+    // credentials puede incluir: email, password, captcha_id, captcha_answer, recaptcha_response
+    return userApi.post("/api/users/login", credentials);
+  },
   // Método para obtener el perfil del usuario
   getUserProfile: () => userApi.get("/api/profile/"),
   updateUserProfile: (userData) => userApi.put("/api/profile/", userData),

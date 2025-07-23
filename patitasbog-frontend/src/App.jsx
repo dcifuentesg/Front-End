@@ -14,7 +14,8 @@ import ViewRecoverPassword from './views/Login/ViewRecoverPassword';
 import ViewDetailsReport from './views/Reports/ViewDetailsReport';
 import ViewEducation from './views/Education/ViewEducation';
 import ConnTest from "./views/conn-test/conn-test";
-import ReportForm from "./components/Reportes/ReportForm"
+import ReportForm from "./components/Reportes/ReportForm";
+import SimpleCaptchaTest from './components/Testing/SimpleCaptchaTest';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
           <Route path="/register" element={<ViewSignUp />} />
           <Route path="/login" element={<ViewLogin />} />
           <Route path="/recover_password" element={<ViewRecoverPassword />} />
+          <Route path="/captcha-test" element={<SimpleCaptchaTest />} />
           <Route path="/change_password" element={<Layout><ViewChangePassword /></Layout>} />
           <Route path="/education" element={<Layout><ViewEducation /></Layout>} />
           

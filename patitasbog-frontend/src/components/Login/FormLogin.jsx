@@ -1,10 +1,11 @@
-import React, { useContext, useState, useEffect} from 'react';
+import React, { useContext, useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../contexts/AuthContext';
 import styles from '../../styles/Login.module.css';
 import { useGoogleLogin } from '@react-oauth/google';
 import { userService } from '../../services/userService';
 import { validarCorreo } from '../../utils/usuariosUtils';
+import CaptchaComponent from './CaptchaComponent';
 
 const FormLogin = () => {
     const { login } = useContext(AuthContext);
@@ -14,40 +15,87 @@ const FormLogin = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+    
+    // Estados para CAPTCHA
+    const [captchaKey, setCaptchaKey] = useState(Date.now());
+    const [captchaValidation, setCaptchaValidation] = useState({ isValid: false, answer: '' });
+    const [captchaError, setCaptchaError] = useState('');
+    
     const navigate = useNavigate();
+
+    // Handlers para el CAPTCHA - Usar useCallback para estabilizar las funciones
+    const handleCaptchaChange = useCallback((data) => {
+        // Este handler puede que ya no sea necesario si el ID se maneja en onValidationChange
+    }, []);
+
+    const handleCaptchaValidationChange = useCallback((validation) => {
+        setCaptchaValidation(validation);
+        if (validation.error) {
+            setCaptchaError(validation.error);
+        } else {
+            setCaptchaError('');
+        }
+    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
         setErrorMessage('');
         setSuccessMessage('');
+        setCaptchaError('');
 
+        // Validar correo
         if (!validarCorreo(correo)) {
-            setErrorMessage("No es posible inicar sesión porque... El correo no tiene un formato válido")
+            setErrorMessage("No es posible iniciar sesión porque... El correo no tiene un formato válido")
             setIsLoading(false)
             return
         }
 
-        try {
-        const credentials = {
-            email: correo,
-            password,
-        };
-
-        const response = await userService.loginUser(credentials);
-
-        if (response.token) {
-            login(response.token);
-            setSuccessMessage('¡Login exitoso! Redirigiendo...');
-            setTimeout(() => {
-            navigate('/home');
-            }, 1500);
+        // Validar CAPTCHA antes de enviar
+        if (!captchaValidation.captcha_id || !captchaValidation.answer) {
+            setCaptchaError('Debes resolver el CAPTCHA');
+            setIsLoading(false);
+            return;
         }
+
+        // La validación se hace completamente en el backend
+        try {
+            const credentials = {
+                email: correo,
+                password,
+                captcha_id: captchaValidation.captcha_id,
+                captcha_answer: captchaValidation.answer
+            };
+
+            console.log('📤 Enviando credenciales al backend:', {
+                email: correo,
+                captcha_id: captchaValidation.captcha_id,
+                captcha_answer: captchaValidation.answer,
+                hasPassword: !!password
+            });
+
+            const response = await userService.loginUser(credentials);
+
+            if (response.token) {
+                login(response.token);
+                setSuccessMessage('¡Login exitoso! Redirigiendo...');
+                setTimeout(() => {
+                    navigate('/home');
+                }, 1500);
+            }
         } catch (error) {
             if (error.message === "Network Error") {
                 setErrorMessage("No se pudo conectar con el servidor. Revisa tu conexión o inténtalo más tarde.");
             } else if (error.response?.data?.message) {
-                setErrorMessage(error.response.data.message);
+                const errorMsg = error.response.data.message;
+                setErrorMessage(errorMsg);
+                
+                // Si el error es relacionado con CAPTCHA, cambiar el key para forzar regeneración
+                if (errorMsg.toLowerCase().includes('captcha')) {
+                    setCaptchaError(errorMsg);
+                    setCaptchaValidation({ isValid: false, answer: '', captcha_id: null });
+                    setCaptchaKey(Date.now()); // Forzar regeneración del componente
+                }
             } else {
                 setErrorMessage("Ocurrió un error inesperado. Inténtalo más tarde.");
             }
@@ -145,11 +193,30 @@ const FormLogin = () => {
                     <Link to="/recover_password" className={styles.recoverPasswordRedirect}>
                         ¿Olvidaste tu contraseña?
                     </Link>
+
+                    {/* CAPTCHA Component */}
+                    <CaptchaComponent
+                        key={captchaKey}
+                        type="math"
+                        onCaptchaChange={handleCaptchaChange}
+                        onValidationChange={handleCaptchaValidationChange}
+                        autoRefresh={false}
+                    />
+
+                    {captchaError && (
+                        <div className={styles.mensaje_error} style={{ marginBottom: '15px' }}>
+                            {captchaError}
+                        </div>
+                    )}
+                    
                     <br />
-                    <button className={styles.loginButton}
-                        disabled={isLoading}
+                    <button 
+                        className={styles.loginButton}
+                        disabled={isLoading || !captchaValidation.answer}
                     >
-                        {isLoading && !successMessage ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+                        {isLoading && !successMessage ? 'Iniciando sesión...' : 
+                         !captchaValidation.answer ? 'Completa el CAPTCHA para continuar' : 
+                         'Iniciar Sesión'}
                     </button>
                 </form>
                 <div className={styles.oSeparator}>
